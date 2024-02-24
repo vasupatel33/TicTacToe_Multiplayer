@@ -14,13 +14,17 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     [SerializeField] GameObject PlayerNamePref, PlayerNameContent, RoomNamePref, RoomnNameContent;
 
+    public static GameManager instance;
+    private void Awake()
+    {
+        instance = this;    
+    }
+
     private void Start()
     {
         LoadingPanel.SetActive(true);
         PhotonNetwork.ConnectUsingSettings();
     }
-
-   
 
     #region PHOTON CALL BACKS
     public override void OnConnected()
@@ -44,7 +48,10 @@ public class GameManager : MonoBehaviourPunCallbacks
         Debug.Log("Lobby joined");
         RoomPanel.SetActive(true);
         LoadingPanel.SetActive(false);
+        PhotonNetwork.NickName = "Player" + Random.Range(0, 500);
     }
+
+ 
     public override void OnJoinedRoom()
     {
         GameStartBtn.SetActive(PhotonNetwork.IsMasterClient);
@@ -52,7 +59,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         PlayerListPanel.SetActive(true);
         CreateRoomPanel.SetActive(false);
         RoomListPanel.SetActive(false);
-        PhotonNetwork.NickName = "Player" + Random.Range(0, 500);
+       
         roomTitle.text = PhotonNetwork.CurrentRoom.Name;
 
         // Clear existing player list UI
@@ -77,6 +84,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         // Update player list UI when a new player enters the room
         GameObject g = Instantiate(PlayerNamePref, PlayerNameContent.transform);
         g.GetComponent<TextMeshProUGUI>().text = newPlayer.NickName;
+        Debug.Log("New player joined"+newPlayer.NickName);
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
@@ -121,7 +129,8 @@ public class GameManager : MonoBehaviourPunCallbacks
                 joinButton.interactable = true;
 
                 joinButton.onClick.RemoveAllListeners();
-                joinButton.onClick.AddListener(() => OnJoinButtonClicked(joinButton.transform.parent.GetChild(0).GetComponent<TextMeshProUGUI>().text));
+                joinButton.GetComponent<ClickAction>().setup(roomList[i]);
+              //  joinButton.onClick.AddListener(() => OnJoinButtonClicked(joinButton.transform.parent.GetChild(0).GetComponent<TextMeshProUGUI>().text));
                 Debug.Log("Btn clicked = " + joinButton.transform.parent.GetChild(0).GetComponent<TextMeshProUGUI>().text);
             }
             else
@@ -131,7 +140,9 @@ public class GameManager : MonoBehaviourPunCallbacks
                 joinButton.interactable = false;
             }
         }
+
     }
+
     public override void OnMasterClientSwitched(Player newMasterClient)
     {
         PhotonNetwork.SetMasterClient(newMasterClient);
@@ -143,6 +154,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         PlayerListPanel.SetActive(false);
         RoomListPanel.SetActive(false);
     }
+
 
     #endregion
 
@@ -172,12 +184,11 @@ public class GameManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LeaveRoom();
     }
     #endregion
-    void OnJoinButtonClicked(string roomName)
+    public void OnJoinButtonClicked(RoomInfo roomName)
     {
         // Code to join the room with the given roomName
         Debug.Log("Joining room: " + roomName);
-        PhotonNetwork.JoinRoom(roomName); // Assuming you're using Photon for multiplayer functionality
+        PhotonNetwork.JoinRoom(roomName.Name); // Assuming you're using Photon for multiplayer functionality
     }
-
 }
 
