@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
@@ -55,7 +56,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         GameStartBtn.SetActive(PhotonNetwork.IsMasterClient);
-        Debug.Log("Room Joined");
+        Debug.Log("Room Joined = "+PhotonNetwork.LocalPlayer);  
         PlayerListPanel.SetActive(true);
         CreateRoomPanel.SetActive(false);
         RoomListPanel.SetActive(false);
@@ -162,7 +163,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     public void CreateRoom()
     {
         RoomOptions roomOptions = new RoomOptions();
-        roomOptions.MaxPlayers = 5;
+        roomOptions.MaxPlayers = 2;
         roomOptions.IsVisible = true;
         PhotonNetwork.CreateRoom(createInputText.text, roomOptions, TypedLobby.Default);
     }
@@ -186,9 +187,24 @@ public class GameManager : MonoBehaviourPunCallbacks
     #endregion
     public void OnJoinButtonClicked(RoomInfo roomName)
     {
-        // Code to join the room with the given roomName
         Debug.Log("Joining room: " + roomName);
         PhotonNetwork.JoinRoom(roomName.Name); // Assuming you're using Photon for multiplayer functionality
     }
+    public void OnBtnClick_StartGame()
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            Debug.Log("Game start btn clicked");
+            photonView.RPC("LoadGameScene", RpcTarget.All);
+        }
+    }
+    [PunRPC]
+    private void LoadGameScene()
+    {
+        SceneManager.LoadScene(1);
+    }
+
+
+    
 }
 
