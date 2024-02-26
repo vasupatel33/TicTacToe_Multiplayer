@@ -13,68 +13,86 @@ public class TileGrid : MonoBehaviourPunCallbacks
 
     [SerializeField] GameObject GameOverPanel, Parent;
     [SerializeField] PlayerMode[] AllplayerMode;
+    [SerializeField] PlayerMode playerMode;
     [SerializeField] Sprite ZeroSprite, CrossSprite;
     public static TileGrid instance;
-    private PlayerMode currentPlayerMode = PlayerMode.zero; // Current player's mode
-    private bool isGameOver = false;
+    private bool isPlayerTurn = true; // Flag to track whose turn it is
 
     private void Awake()
     {
         instance = this;
     }
-
     public void UserMove(GameObject g, int no)
     {
-        if (isGameOver || !photonView.IsMine) // Check if the game is over or if it's not the local player's turn
-            return;
+        if (!isPlayerTurn) // Check if it's not the player's turn
+            return; // Exit the method if it's not the player's turn
 
-        PlayerMode modeToSet = currentPlayerMode == PlayerMode.zero ? PlayerMode.cross : PlayerMode.zero;
-        SetTileState(g, no, modeToSet); // Set the tile state for the local player
+        if (playerMode == PlayerMode.zero)
+        {
+            g.GetComponent<SpriteRenderer>().sprite = CrossSprite;
+            g.GetComponent<BoxCollider2D>().enabled = false;
+            AllplayerMode[no] = PlayerMode.cross;
+            playerMode = PlayerMode.cross; // Update playerMode to cross before RPC call
 
-        photonView.RPC("SyncMove", RpcTarget.Others, no, (int)modeToSet); // Sync the move with other players
-        CheckWinOrNot(); // Check if the game is won after the move
+            photonView.RPC("SyncMove", RpcTarget.Others, no, (int)PlayerMode.cross);
+        }
+        else
+        {
+            g.GetComponent<SpriteRenderer>().sprite = ZeroSprite;
+            g.GetComponent<BoxCollider2D>().enabled = false;
+            AllplayerMode[no] = PlayerMode.zero;
+            playerMode = PlayerMode.zero; // Update playerMode to zero before RPC call
+
+            photonView.RPC("SyncMove", RpcTarget.Others, no, (int)PlayerMode.zero);
+        }
+        CheckWinOrNot();
+
+        isPlayerTurn = !isPlayerTurn; // Toggle isPlayerTurn to switch to the other player's turn
     }
+
+
 
     [PunRPC]
     private void SyncMove(int index, int mode)
     {
-        PlayerMode modeToSet = (PlayerMode)mode;
+        AllplayerMode[index] = (PlayerMode)mode;
         GameObject tile = Parent.transform.GetChild(index).gameObject;
-        SetTileState(tile, index, modeToSet); // Set the tile state for other players
-        CheckWinOrNot(); // Check if the game is won after the move
-    }
-
-    private void SetTileState(GameObject tile, int index, PlayerMode mode)
-    {
-        AllplayerMode[index] = mode;
         tile.GetComponent<BoxCollider2D>().enabled = false;
 
-        if (mode == PlayerMode.cross)
+        if ((PlayerMode)mode == PlayerMode.cross)
         {
             tile.GetComponent<SpriteRenderer>().sprite = CrossSprite;
         }
-        else if (mode == PlayerMode.zero)
+        else if ((PlayerMode)mode == PlayerMode.zero)
         {
             tile.GetComponent<SpriteRenderer>().sprite = ZeroSprite;
         }
-    }
 
-    private void CheckWinOrNot()
+        CheckWinOrNot();
+
+        isPlayerTurn = true; // Switch back to the first player's turn
+    }
+    public void CheckWinOrNot()
     {
-        // Implement win condition checking
-        // Set isGameOver to true if the game is won
+        int[,] data = new int[8, 3] { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 7, 8 }, { 0, 3, 6 }, { 1, 4, 7 }, { 2, 5, 8 }, { 0, 4, 8 }, { 2, 4, 6 } };
+        for (int i = 0; i < 8; i++)
+        {
+            if ((AllplayerMode[data[i, 0]] == PlayerMode.zero && AllplayerMode[data[i, 1]] == PlayerMode.zero && AllplayerMode[data[i, 2]] == PlayerMode.zero) ||
+                (AllplayerMode[data[i, 0]] == PlayerMode.cross && AllplayerMode[data[i, 1]] == PlayerMode.cross && AllplayerMode[data[i, 2]] == PlayerMode.cross))
+            {
+                Debug.Log("Player win = " + playerMode + "...." + i);
+                GameOverPanel.SetActive(true);
+            }
+        }
     }
-
     public void OnClick_HomeBtn()
     {
         photonView.RPC("SyncPerformAction", RpcTarget.All, (int)ActionType.LoadMainMenu);
     }
-
     public void OnClick_RetryBtn()
     {
         photonView.RPC("SyncPerformAction", RpcTarget.All, (int)ActionType.ReloadScene);
     }
-
     [PunRPC]
     private void SyncPerformAction(int actionType)
     {
@@ -89,7 +107,6 @@ public class TileGrid : MonoBehaviourPunCallbacks
                 // Add cases for other action types if needed
         }
     }
-
     public enum ActionType
     {
         ReloadScene,
