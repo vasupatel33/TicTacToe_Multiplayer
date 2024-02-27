@@ -16,41 +16,71 @@ public class TileGrid : MonoBehaviourPunCallbacks
     [SerializeField] PlayerMode playerMode;
     [SerializeField] Sprite ZeroSprite, CrossSprite;
     public static TileGrid instance;
-    private bool isPlayerTurn = true; // Flag to track whose turn it is
+    private static bool isPlayerTurn = true; // Flag to track whose turn it is
 
     private void Awake()
     {
         instance = this;
     }
+    //public void UserMove(GameObject g, int no)
+    //{
+    //    if (!isPlayerTurn) // Check if it's not the player's turn
+    //    {
+
+
+    //        if (playerMode == PlayerMode.zero)
+    //        {
+    //            g.GetComponent<SpriteRenderer>().sprite = CrossSprite;
+    //            g.GetComponent<BoxCollider2D>().enabled = false;
+    //            AllplayerMode[no] = PlayerMode.cross;
+    //            playerMode = PlayerMode.cross; // Update playerMode to cross before RPC call
+
+    //            photonView.RPC("SyncMove", RpcTarget.Others, no, (int)PlayerMode.cross);
+    //        }
+    //        else
+    //        {
+    //            g.GetComponent<SpriteRenderer>().sprite = ZeroSprite;
+    //            g.GetComponent<BoxCollider2D>().enabled = false;
+    //            AllplayerMode[no] = PlayerMode.zero;
+    //            playerMode = PlayerMode.zero; // Update playerMode to zero before RPC call
+
+    //            photonView.RPC("SyncMove", RpcTarget.Others, no, (int)PlayerMode.zero);
+    //        }
+    //        CheckWinOrNot();
+    //    }
+    //    isPlayerTurn = !isPlayerTurn; // Toggle isPlayerTurn to switch to the other player's turn
+    //}
+    private void Update()
+    {
+        Debug.Log("Turn = "+isPlayerTurn);
+    }
     public void UserMove(GameObject g, int no)
     {
         if (!isPlayerTurn) // Check if it's not the player's turn
-            return; // Exit the method if it's not the player's turn
-
-        if (playerMode == PlayerMode.zero)
         {
+            isPlayerTurn = true;
+            Debug.Log("IF called");
             g.GetComponent<SpriteRenderer>().sprite = CrossSprite;
             g.GetComponent<BoxCollider2D>().enabled = false;
             AllplayerMode[no] = PlayerMode.cross;
             playerMode = PlayerMode.cross; // Update playerMode to cross before RPC call
 
             photonView.RPC("SyncMove", RpcTarget.Others, no, (int)PlayerMode.cross);
+            CheckWinOrNot();
         }
         else
         {
+            isPlayerTurn = false;
+            Debug.Log("Else called");
             g.GetComponent<SpriteRenderer>().sprite = ZeroSprite;
             g.GetComponent<BoxCollider2D>().enabled = false;
             AllplayerMode[no] = PlayerMode.zero;
             playerMode = PlayerMode.zero; // Update playerMode to zero before RPC call
 
             photonView.RPC("SyncMove", RpcTarget.Others, no, (int)PlayerMode.zero);
+            CheckWinOrNot();
         }
-        CheckWinOrNot();
-
-        isPlayerTurn = !isPlayerTurn; // Toggle isPlayerTurn to switch to the other player's turn
     }
-
-
 
     [PunRPC]
     private void SyncMove(int index, int mode)

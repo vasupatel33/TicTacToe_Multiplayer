@@ -42,7 +42,6 @@ public class GameManager : MonoBehaviourPunCallbacks
         Debug.Log("Room created successfully");
         PlayerListPanel.SetActive(true);
         CreateRoomPanel.SetActive(false);
-        
     }
     public override void OnJoinedLobby()
     {
@@ -52,7 +51,6 @@ public class GameManager : MonoBehaviourPunCallbacks
         PhotonNetwork.NickName = "Player" + Random.Range(0, 500);
     }
 
- 
     public override void OnJoinedRoom()
     {
         GameStartBtn.SetActive(PhotonNetwork.IsMasterClient);
