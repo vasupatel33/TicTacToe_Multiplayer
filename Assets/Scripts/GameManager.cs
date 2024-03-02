@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
-    [SerializeField] GameObject LoadingPanel, RoomPanel, CreateRoomPanel, PlayerListPanel, RoomListPanel, GameStartBtn;
+    [SerializeField] GameObject FirstPanel, LoadingPanel, RoomPanel, CreateRoomPanel, PlayerListPanel, RoomListPanel, GameStartBtn;
     [SerializeField] TMP_InputField createInputText, joinInputText;
     [SerializeField] TextMeshProUGUI roomTitle;
 
@@ -24,7 +24,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     private void Start()
     {
         LoadingPanel.SetActive(true);
-        PhotonNetwork.ConnectUsingSettings();
+        
     }
 
     #region PHOTON CALL BACKS
@@ -183,6 +183,18 @@ public class GameManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LeaveRoom();
     }
     #endregion
+
+    public void OnClick_MultiplayerButton()
+    {
+        FirstPanel.SetActive(false);
+        LoadingPanel.SetActive(true);
+        PhotonNetwork.ConnectUsingSettings();
+    }
+    public void OnClick_ComputerButton()
+    {
+        SceneManager.LoadScene(2);
+    }
+
     public void OnJoinButtonClicked(RoomInfo roomName)
     {
         Debug.Log("Joining room: " + roomName);

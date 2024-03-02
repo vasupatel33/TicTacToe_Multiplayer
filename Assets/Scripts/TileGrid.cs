@@ -1,8 +1,8 @@
-using Photon.Pun;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class TileGrid : MonoBehaviourPunCallbacks
+public class TileGrid : MonoBehaviour
 {
     public enum PlayerMode
     {
@@ -15,148 +15,242 @@ public class TileGrid : MonoBehaviourPunCallbacks
     [SerializeField] PlayerMode[] AllplayerMode;
     [SerializeField] PlayerMode playerMode;
     [SerializeField] Sprite ZeroSprite, CrossSprite;
+    [SerializeField] TextMeshProUGUI TitleGameOverPanel;
     public static TileGrid instance;
-    private bool isPlayerTurn = true;
-    int MoveCount=0;
+
+    int MoveCount;
 
     private void Awake()
     {
         instance = this;
     }
-    private void Start()
-    {
-      
-    }
-    private void Update()
-    {
-        Debug.Log("Turn = "+isPlayerTurn);
-    }
     public void UserMove(GameObject g, int no)
     {
-        MoveCount++;
-        if (!isPlayerTurn)
+        if (AllplayerMode[no] == PlayerMode.empty) // Check if the position is empty
         {
-            Debug.Log("Player's turn: Cross");
-            PerformMove(g, no, PlayerMode.cross);
-         //   FirstPlayerPanel.SetActive(true);
-        }
-        else
-        {
-            Debug.Log("Player's turn: Zero");
-            PerformMove(g, no, PlayerMode.zero);
-          //  FirstPlayerPanel.SetActive(true);
+            PerformMove(g, no, PlayerMode.cross); // Player's move
+            MoveCount++; // Increment move count after player's move
+            Debug.Log("Current count = " + MoveCount); // Log the current move count
 
+            if (!CheckGameOver(AllplayerMode)) // Proceed only if the game is not over
+            {
+                int bestMove = Minimax(AllplayerMode, PlayerMode.zero, 0); // Start Minimax with depth 0
+
+                // Check if bestMove is valid
+                if (bestMove >= 0 && bestMove < Parent.transform.childCount)
+                {
+                    GameObject computerTile = Parent.transform.GetChild(bestMove).gameObject;
+                    PerformMove(computerTile, bestMove, PlayerMode.zero); // Computer's move
+                    MoveCount++; // Increment move count after computer's move
+                    Debug.Log("Current count = " + MoveCount); // Log the current move count
+                    CheckGameOver(AllplayerMode); // Check game over after computer's move
+                }
+                else if (bestMove == -1)
+                {
+                    Debug.LogWarning("No valid moves left!"); // Handle the case when no valid moves are left
+                }
+                else
+                {
+                    Debug.LogError("Invalid bestMove index: " + bestMove);
+                }
+            }
         }
     }
+
+
     private void PerformMove(GameObject g, int index, PlayerMode mode)
     {
         g.GetComponent<SpriteRenderer>().sprite = mode == PlayerMode.cross ? CrossSprite : ZeroSprite;
         g.GetComponent<BoxCollider2D>().enabled = false;
         AllplayerMode[index] = mode;
-        playerMode = mode; // Update playerMode
+    }
+    private int Minimax(PlayerMode[] board, PlayerMode player, int depth)
+    {
+        const int MAX_DEPTH = 4; // Adjust the depth limit for the Minimax algorithm
 
-        photonView.RPC("SyncMove", RpcTarget.AllBuffered, index, (int)mode);
-        CheckWinOrNot();
+        int[,] winConditions = new int[8, 3] { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 7, 8 }, { 0, 3, 6 }, { 1, 4, 7 }, { 2, 5, 8 }, { 0, 4, 8 }, { 2, 4, 6 } };
+
+        int bestScore;
+        int bestMove = -1;
+
+        // Check if the game is over or if the depth limit is reached
+        if (CheckGameOver(board) || depth == MAX_DEPTH)
+        {
+            int evaluation = Evaluate(board);
+            Debug.Log($"Evaluation at depth {depth}: {evaluation}");
+            return evaluation;
+        }
+
+        if (player == PlayerMode.zero) // Computer's turn
+        {
+            bestScore = int.MinValue;
+            for (int i = 0; i < board.Length; i++)
+            {
+                if (board[i] == PlayerMode.empty) // If the position is empty
+                {
+                    board[i] = PlayerMode.zero;
+                    int score = Minimax(board, PlayerMode.cross, depth + 1); // Switch player and increment depth
+                    board[i] = PlayerMode.empty; // Undo move
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestMove = i;
+                    }
+                }
+            }
+        }
+        else // Player's turn
+        {
+            bestScore = int.MaxValue;
+            for (int i = 0; i < board.Length; i++)
+            {
+                if (board[i] == PlayerMode.empty) // If the position is empty
+                {
+                    board[i] = PlayerMode.cross;
+                    int score = Minimax(board, PlayerMode.zero, depth + 1); // Switch player and increment depth
+                    board[i] = PlayerMode.empty; // Undo move
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        bestMove = i;
+                    }
+                }
+            }
+        }
+
+        if (depth == 0) // Return the best move at the top level of Minimax
+        {
+            Debug.Log($"At depth {depth}: Player {player} evaluated score: {bestScore}");
+
+            return bestMove;
+        }
+
+        return bestScore;
     }
 
-    [PunRPC]
-    private void SyncMove(int index, int mode)
+    private int Evaluate(PlayerMode[] board)
     {
-        isPlayerTurn = !isPlayerTurn;
-        Debug.Log("Player switched = " + isPlayerTurn);
+        int score = 0;
 
-        AllplayerMode[index] = (PlayerMode)mode;
-        GameObject tile = Parent.transform.GetChild(index).gameObject;
-        tile.GetComponent<BoxCollider2D>().enabled = false;
+        // Check for win or loss
+        for (int i = 0; i < winConditions.GetLength(0); i++)
+        {
+            int a = winConditions[i, 0];
+            int b = winConditions[i, 1];
+            int c = winConditions[i, 2];
 
-        if ((PlayerMode)mode == PlayerMode.cross)
-        {
-            tile.GetComponent<SpriteRenderer>().sprite = CrossSprite;
-
-        }
-        else if ((PlayerMode)mode == PlayerMode.zero)
-        {
-            tile.GetComponent<SpriteRenderer>().sprite = ZeroSprite;
-        }
-        if (isPlayerTurn) // If it's now the current player's turn
-        {
-            if (photonView.IsMine) // If it's the local player's turn
+            if (board[a] == PlayerMode.zero && board[b] == PlayerMode.zero && board[c] == PlayerMode.zero)
             {
-                Debug.Log("It's my turn. Showing panel...");
-                FirstPlayerPanel.SetActive(false); // Show panel for the local player
+                Debug.Log("Computer wins!");
+                return int.MaxValue; // Computer wins
             }
-            else
+            else if (board[a] == PlayerMode.cross && board[b] == PlayerMode.cross && board[c] == PlayerMode.cross)
             {
-                Debug.Log("It's opponent's turn. Hiding panel...");
-                FirstPlayerPanel.SetActive(true); // Hide panel for the opponent
-            }
-        }
-        else // If it's not the current player's turn
-        {
-            if (photonView.IsMine) // If it's the local player's turn
-            {
-                Debug.Log("It's my opponent's turn. Hiding panel...");
-                FirstPlayerPanel.SetActive(true); // Hide panel for the local player
-            }
-            else
-            {
-                Debug.Log("It's my turn. Showing panel...");
-                FirstPlayerPanel.SetActive(false); // Show panel for the opponent
+                Debug.Log("Player wins!");
+                return int.MinValue; // Player wins
             }
         }
 
-        CheckWinOrNot();
+        // Evaluate based on positions
+        score += EvaluatePosition(board, PlayerMode.zero); // Computer's positions
+        score -= EvaluatePosition(board, PlayerMode.cross); // Player's positions
+
+        Debug.Log("Final score: " + score);
+
+        return score;
     }
 
-    public void CheckWinOrNot()
+    private int EvaluatePosition(PlayerMode[] board, PlayerMode player)
     {
-        int[,] data = new int[8, 3] { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 7, 8 }, { 0, 3, 6 }, { 1, 4, 7 }, { 2, 5, 8 }, { 0, 4, 8 }, { 2, 4, 6 } };
-        for (int i = 0; i < 8; i++)
+        int score = 0;
+
+        // Evaluate based on possible winning lines
+        for (int i = 0; i < winConditions.GetLength(0); i++)
         {
-            if ((AllplayerMode[data[i, 0]] == PlayerMode.zero && AllplayerMode[data[i, 1]] == PlayerMode.zero && AllplayerMode[data[i, 2]] == PlayerMode.zero) ||
-                (AllplayerMode[data[i, 0]] == PlayerMode.cross && AllplayerMode[data[i, 1]] == PlayerMode.cross && AllplayerMode[data[i, 2]] == PlayerMode.cross))
+            int countPlayer = 0;
+            int countEmpty = 0;
+
+            for (int j = 0; j < winConditions.GetLength(1); j++)
             {
-                Debug.Log("Player win = " + playerMode + "...." + i);
-                GameOverPanel.SetActive(true);
+                int index = winConditions[i, j];
+                if (board[index] == player)
+                {
+                    countPlayer++;
+                }
+                else if (board[index] == PlayerMode.empty)
+                {
+                    countEmpty++;
+                }
+            }
+
+            // Assign scores based on the number of player's pieces and empty spaces in winning lines
+            if (countPlayer == 2 && countEmpty == 1)
+            {
+                score += 10; // Two in a row with one empty space
+            }
+            else if (countPlayer == 1 && countEmpty == 2)
+            {
+                score += 5; // One in a row with two empty spaces
             }
         }
-        if (MoveCount == 9)
+
+        Debug.Log($"Evaluation for {player}: {score}");
+
+        return score;
+    }
+
+
+    int[,] winConditions = new int[8, 3] { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 7, 8 }, { 0, 3, 6 }, { 1, 4, 7 }, { 2, 5, 8 }, { 0, 4, 8 }, { 2, 4, 6 } };
+    private bool CheckGameOver(PlayerMode[] board)
+    {
+        // Remove MoveCount increment from this method as it should be handled in the UserMove method
+
+        for (int i = 0; i < winConditions.GetLength(0); i++)
+        {
+            int a = winConditions[i, 0];
+            int b = winConditions[i, 1];
+            int c = winConditions[i, 2];
+
+            if (board[a] != PlayerMode.empty &&
+                board[a] == board[b] &&
+                board[b] == board[c])
+            {
+                // Log the winning player
+                Debug.Log("Player " + board[a] + " wins!");
+
+                return true;
+            }
+        }
+
+        // Check for draw
+        bool isDraw = true;
+        foreach (PlayerMode mode in board)
+        {
+            if (mode == PlayerMode.empty)
+            {
+                isDraw = false;
+                break;
+            }
+        }
+
+        if (isDraw && MoveCount == 9)
         {
             MoveCount = 0;
             GameOverPanel.SetActive(true);
-            Debug.Log("No move available");
+            TitleGameOverPanel.text = "Game Drawn Well Played!";
+            Debug.Log("Game drawn");
+            return true;
         }
-        else
-        {
-            Debug.Log("Moves available = "+MoveCount);
-        }
+
+        return false;
     }
+
     public void OnClick_HomeBtn()
     {
-        photonView.RPC("SyncPerformAction", RpcTarget.All, (int)ActionType.LoadMainMenu);
+        SceneManager.LoadScene(0);
     }
     public void OnClick_RetryBtn()
     {
-        photonView.RPC("SyncPerformAction", RpcTarget.All, (int)ActionType.ReloadScene);
-    }
-    [PunRPC]
-    private void SyncPerformAction(int actionType)
-    {
-        switch ((ActionType)actionType)
-        {
-            case ActionType.LoadMainMenu:
-                SceneManager.LoadScene(0);
-                break;
-            case ActionType.ReloadScene:
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-                break;
-                // Add cases for other action types if needed
-        }
-    }
-    public enum ActionType
-    {
-        ReloadScene,
-        LoadMainMenu
-        // Add more action types as needed
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }
